@@ -1,0 +1,10 @@
+# Native splash screen configuration for DropNow
+# Run: dart run flutter_native_splash:create
+
+flutter_native_splash:
+  color: "#121212"
+  android: true
+  ios: false
+  android_12:
+    color: "#121212"
+    icon_background_color: "#121212"

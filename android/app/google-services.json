@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "42037920456",
+    "project_id": "dropnow-app",
+    "storage_bucket": "dropnow-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:42037920456:android:d370b9a188b8a7a8c55bfd",
+        "android_client_info": {
+          "package_name": "com.dropnow.drop_now"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOHhsaB-3pYgdljmV-1u-mEPY6fiw_aWU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
