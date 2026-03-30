@@ -16,3 +16,5 @@ export 'premium_service.dart';
 export 'crash_service.dart';
 export 'deep_link_service.dart';
 export 'reward_service.dart';
+export 'invite_service.dart';
+export 'rating_service.dart';

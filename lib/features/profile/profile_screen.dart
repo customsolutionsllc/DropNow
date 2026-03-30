@@ -4,6 +4,7 @@ import 'package:drop_now/core/models/models.dart';
 import 'package:drop_now/core/services/services.dart';
 import 'package:drop_now/app/widgets/widgets.dart';
 import 'package:drop_now/features/premium/premium_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ProfileScreen extends StatefulWidget {
   final PreferencesService prefsService;
@@ -15,7 +16,10 @@ class ProfileScreen extends StatefulWidget {
   final PremiumService premiumService;
   final BillingService billingService;
   final AdService adService;
+  final InviteService inviteService;
+  final RatingService ratingService;
   final VoidCallback? onSettingsChanged;
+  final VoidCallback? onSignOut;
 
   const ProfileScreen({
     super.key,
@@ -28,7 +32,10 @@ class ProfileScreen extends StatefulWidget {
     required this.premiumService,
     required this.billingService,
     required this.adService,
+    required this.inviteService,
+    required this.ratingService,
     this.onSettingsChanged,
+    this.onSignOut,
   });
 
   @override
@@ -42,11 +49,26 @@ class ProfileScreenState extends State<ProfileScreen> {
   late TimeOfDay _windowStart;
   late TimeOfDay _windowEnd;
   late bool _isActive;
+  bool _showRatingPrompt = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _checkRatingEligibility();
+  }
+
+  void _checkRatingEligibility() {
+    final stats = widget.statsService;
+    final totalCompleted = stats.totalCompleted;
+    // Approximate distinct days from execution records
+    final distinctDays = stats.currentStreak > 0 ? stats.currentStreak : 1;
+    if (widget.ratingService.isEligible(
+      totalCompleted: totalCompleted,
+      distinctDaysUsed: distinctDays,
+    )) {
+      setState(() => _showRatingPrompt = true);
+    }
   }
 
   void _loadPrefs() {
@@ -199,6 +221,278 @@ class ProfileScreenState extends State<ProfileScreen> {
       await widget.notificationService.cancelAll();
     }
     widget.onSettingsChanged?.call();
+  }
+
+  Future<void> _handleSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Sign Out?'),
+        content: const Text(
+          'Your local data is kept, but cloud sync and challenges '
+          'will stop until you sign in again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.authService.signOut();
+    // Re-establish anonymous auth and trigger login flow
+    await widget.authService.ensureSignedIn();
+    if (!mounted) return;
+    widget.onSignOut?.call();
+  }
+
+  void _showAccountDetails() {
+    final auth = widget.authService;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenPadding,
+          AppSpacing.md,
+          AppSpacing.screenPadding,
+          AppSpacing.xl,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text('Account', style: Theme.of(ctx).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.lg),
+              _accountRow(
+                ctx,
+                Icons.person_rounded,
+                'Name',
+                auth.displayName ?? 'Guest',
+              ),
+              _accountRow(
+                ctx,
+                Icons.email_rounded,
+                'Email',
+                auth.email ?? 'Not linked',
+              ),
+              _accountRow(
+                ctx,
+                Icons.login_rounded,
+                'Sign-in Method',
+                auth.authProviderLabel,
+              ),
+              if (auth.uid != null)
+                _accountRow(ctx, Icons.fingerprint_rounded, 'UID', auth.uid!),
+              const SizedBox(height: AppSpacing.lg),
+              if (!auth.isSocialSignIn)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      widget.onSignOut?.call();
+                    },
+                    icon: const Icon(Icons.link_rounded, size: 20),
+                    label: const Text('Link Google or Facebook'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _accountRow(
+    BuildContext ctx,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          border: Border.all(color: AppColors.surfaceBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.accent, size: 20),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(ctx).textTheme.bodySmall),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: Theme.of(ctx).textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showAboutDialog(
+      context: context,
+      applicationName: 'DropNow',
+      applicationVersion: '1.0.0',
+      applicationIcon: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.military_tech_rounded,
+          color: AppColors.accent,
+          size: 28,
+        ),
+      ),
+      applicationLegalese:
+          '\u00a9 2026 Custom Solutions LLC\nAll rights reserved.',
+      children: [
+        const SizedBox(height: 16),
+        const Text(
+          'Your personal drill sergeant that delivers random '
+          'exercise commands throughout the day to keep you active.',
+        ),
+      ],
+    );
+  }
+
+  void _showAppearanceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenPadding,
+          AppSpacing.md,
+          AppSpacing.screenPadding,
+          AppSpacing.xl,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text('Appearance', style: Theme.of(ctx).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.lg),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.dark_mode_rounded,
+                      color: AppColors.accent,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dark Mode',
+                            style: Theme.of(ctx).textTheme.titleMedium
+                                ?.copyWith(color: AppColors.accent),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Active \u2014 the only way to operate',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.accent,
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'More themes coming soon.',
+                style: Theme.of(
+                  ctx,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendFeedback() async {
+    const subject = 'DropNow Feedback';
+    const body =
+        'Hi DropNow team,\n\n'
+        '[Describe your feedback, bug report, or feature request here]\n\n'
+        'Device: Android\n'
+        'App Version: 1.0.0';
+    await Share.share(body, subject: subject);
   }
 
   void _showOptionPicker<T>({
@@ -407,7 +701,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.person_rounded,
                   title: 'Account',
                   subtitle: widget.authService.authProviderLabel,
-                  onTap: () {},
+                  onTap: _showAccountDetails,
                 ),
                 SettingsRowTile(
                   icon: Icons.cloud_rounded,
@@ -417,35 +711,106 @@ class ProfileScreenState extends State<ProfileScreen> {
                       : 'Not configured',
                   onTap: _syncNow,
                 ),
-                SettingsRowTile(
-                  icon: Icons.people_rounded,
-                  title: 'Social',
-                  subtitle: 'Friends & challenges',
-                  onTap: () {},
-                ),
               ]),
               const SizedBox(height: AppSpacing.lg),
+
+              // Social & Sharing
+              const SectionHeader(title: 'Social'),
+              _buildSettingsGroup(context, [
+                SettingsRowTile(
+                  icon: Icons.share_rounded,
+                  title: 'Invite Friends',
+                  subtitle: 'Share DropNow with your squad',
+                  onTap: () => widget.inviteService.shareInvite(),
+                ),
+                if (widget.authService.uid != null)
+                  SettingsRowTile(
+                    icon: Icons.copy_rounded,
+                    title: 'Copy My ID',
+                    subtitle: widget.authService.uid ?? '',
+                    onTap: () async {
+                      final uid = widget.authService.uid;
+                      if (uid == null) return;
+                      final ok = await widget.inviteService.copyId(uid);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok ? 'ID copied to clipboard!' : 'Failed to copy',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                if (widget.authService.uid != null)
+                  SettingsRowTile(
+                    icon: Icons.send_rounded,
+                    title: 'Share My ID',
+                    subtitle: 'Let friends challenge you',
+                    onTap: () {
+                      final uid = widget.authService.uid;
+                      if (uid != null) widget.inviteService.shareMyId(uid);
+                    },
+                  ),
+              ]),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Rating prompt
+              if (_showRatingPrompt) ...[
+                RatingPromptCard(
+                  onYes: () async {
+                    setState(() => _showRatingPrompt = false);
+                    await widget.ratingService.requestReview();
+                  },
+                  onDismiss: () {
+                    setState(() => _showRatingPrompt = false);
+                    widget.ratingService.markPromptShown();
+                  },
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
 
               // App settings
               const SectionHeader(title: 'App'),
               _buildSettingsGroup(context, [
                 SettingsRowTile(
-                  icon: Icons.color_lens_rounded,
+                  icon: Icons.palette_rounded,
                   title: 'Appearance',
                   subtitle: 'Dark mode',
-                  onTap: () {},
+                  onTap: _showAppearanceSheet,
+                ),
+                SettingsRowTile(
+                  icon: Icons.star_rounded,
+                  title: 'Rate DropNow',
+                  subtitle: 'Leave us a review',
+                  onTap: () => widget.ratingService.requestReview(),
+                ),
+                SettingsRowTile(
+                  icon: Icons.feedback_rounded,
+                  title: 'Send Feedback',
+                  subtitle: 'Report bugs or request features',
+                  onTap: _sendFeedback,
                 ),
                 SettingsRowTile(
                   icon: Icons.info_rounded,
                   title: 'About DropNow',
                   subtitle: 'Version 1.0.0',
-                  onTap: () {},
+                  onTap: _showAboutDialog,
                 ),
-                SettingsRowTile(
-                  icon: Icons.feedback_rounded,
-                  title: 'Send Feedback',
-                  onTap: () {},
-                ),
+                if (widget.authService.isSocialSignIn)
+                  SettingsRowTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Sign Out',
+                    subtitle: widget.authService.displayName ?? '',
+                    onTap: _handleSignOut,
+                  )
+                else if (!widget.authService.isSocialSignIn)
+                  SettingsRowTile(
+                    icon: Icons.login_rounded,
+                    title: 'Sign In',
+                    subtitle: 'Link Google or Facebook',
+                    onTap: () => widget.onSignOut?.call(),
+                  ),
               ]),
               const SizedBox(height: AppSpacing.xl),
 
@@ -460,35 +825,35 @@ class ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(BuildContext context) {
+    final name = widget.authService.displayName ?? 'Soldier';
+    final photoUrl = widget.authService.photoUrl;
+
     return Semantics(
       label:
-          'Profile: Soldier, Rank Recruit, ${widget.statsService.totalCompleted} commands completed',
+          'Profile: $name, Rank Recruit, ${widget.statsService.totalCompleted} commands completed',
       child: DashboardCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.15),
+            if (photoUrl != null)
+              ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.military_tech_rounded,
-                color: AppColors.accent,
-                size: 32,
-              ),
-            ),
+                child: Image.network(
+                  photoUrl,
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _defaultAvatar(),
+                ),
+              )
+            else
+              _defaultAvatar(),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Soldier',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                  Text(name, style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Rank: Recruit \u00b7 ${widget.statsService.totalCompleted} commands completed',
@@ -499,6 +864,22 @@ class ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Icon(
+        Icons.military_tech_rounded,
+        color: AppColors.accent,
+        size: 32,
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +7,11 @@ import 'package:drop_now/app/app.dart';
 import 'package:drop_now/core/services/services.dart';
 
 Future<void> main() async {
+  // Silence all debugPrint in release builds — prevents log leaks to logcat
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
+
   final crashService = CrashService();
 
   runZonedGuarded(
@@ -65,6 +71,12 @@ Future<void> main() async {
       // Initialize daily reward service
       final rewardService = RewardService(prefsService.prefs);
 
+      // Initialize rating service
+      final ratingService = RatingService(prefsService.prefs);
+
+      // Initialize invite service
+      final inviteService = InviteService();
+
       // Initialize AdService (monetization)
       final adService = AdService(prefsService.prefs);
       await adService.init();
@@ -88,7 +100,7 @@ Future<void> main() async {
       if (firebaseReady) {
         final user = await authService.ensureSignedIn();
         debugPrint(
-          '[AUTH] signed in: ${user != null}, uid: ${authService.uid}, isAnonymous: ${authService.isAnonymous}',
+          '[AUTH] signed in: ${user != null}, isAnonymous: ${authService.isAnonymous}',
         );
         syncService = FirestoreSyncService(
           authService: authService,
@@ -119,6 +131,8 @@ Future<void> main() async {
           storageService: storageService,
           statsService: statsService,
           rewardService: rewardService,
+          ratingService: ratingService,
+          inviteService: inviteService,
           adService: adService,
           billingService: billingService,
           premiumService: premiumService,

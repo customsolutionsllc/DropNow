@@ -78,9 +78,9 @@ class FirestoreSyncService {
       final doc = await _userDoc.get();
       if (!doc.exists) {
         await _userDoc.set(_buildUserProfile());
-        debugPrint('[SYNC] Created user profile doc at users/${_auth.uid}');
+        debugPrint('[SYNC] Created user profile doc');
       } else {
-        debugPrint('[SYNC] User profile already exists at users/${_auth.uid}');
+        debugPrint('[SYNC] User profile already exists');
       }
     } catch (e) {
       debugPrint('[SYNC] bootstrapUserProfile error: $e');

@@ -7,6 +7,7 @@ import 'package:drop_now/core/services/challenge_service.dart';
 import 'package:drop_now/core/services/ad_service.dart';
 import 'package:drop_now/core/services/execution_storage_service.dart';
 import 'package:drop_now/core/services/firestore_sync_service.dart';
+import 'package:drop_now/core/services/invite_service.dart';
 import 'package:drop_now/app/widgets/widgets.dart';
 
 class ChallengesScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class ChallengesScreen extends StatefulWidget {
   final ExecutionStorageService storageService;
   final FirestoreSyncService? syncService;
   final AdService adService;
+  final InviteService inviteService;
 
   const ChallengesScreen({
     super.key,
@@ -23,6 +25,7 @@ class ChallengesScreen extends StatefulWidget {
     required this.storageService,
     this.syncService,
     required this.adService,
+    required this.inviteService,
   });
 
   @override
@@ -68,6 +71,25 @@ class ChallengesScreenState extends State<ChallengesScreen> {
                 const SizedBox(height: AppSpacing.md),
                 _buildUidCard(context),
               ],
+
+              const SizedBox(height: AppSpacing.md),
+
+              // Invite friends
+              OutlinedButton.icon(
+                onPressed: () => widget.inviteService.shareInvite(),
+                icon: const Icon(Icons.share_rounded),
+                label: const Text('Invite Friends'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: const BorderSide(color: AppColors.accent),
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.buttonRadius,
+                    ),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: AppSpacing.xl),
 

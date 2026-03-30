@@ -20,8 +20,11 @@ class AppShell extends StatefulWidget {
   final AuthService authService;
   final FirestoreSyncService? syncService;
   final ChallengeService? challengeService;
+  final RatingService ratingService;
+  final InviteService inviteService;
   final CrashService crashService;
   final DeepLinkService deepLinkService;
+  final VoidCallback? onSignOut;
 
   const AppShell({
     super.key,
@@ -32,6 +35,8 @@ class AppShell extends StatefulWidget {
     required this.storageService,
     required this.statsService,
     required this.rewardService,
+    required this.ratingService,
+    required this.inviteService,
     required this.adService,
     required this.billingService,
     required this.premiumService,
@@ -40,6 +45,7 @@ class AppShell extends StatefulWidget {
     this.challengeService,
     required this.crashService,
     required this.deepLinkService,
+    this.onSignOut,
   });
 
   @override
@@ -121,6 +127,7 @@ class _AppShellState extends State<AppShell> {
           storageService: widget.storageService,
           syncService: widget.syncService,
           adService: widget.adService,
+          inviteService: widget.inviteService,
         ),
       ),
       _ErrorBoundary(
@@ -136,7 +143,10 @@ class _AppShellState extends State<AppShell> {
           premiumService: widget.premiumService,
           billingService: widget.billingService,
           adService: widget.adService,
+          ratingService: widget.ratingService,
+          inviteService: widget.inviteService,
           onSettingsChanged: _onProfileSettingsChanged,
+          onSignOut: widget.onSignOut,
         ),
       ),
     ];

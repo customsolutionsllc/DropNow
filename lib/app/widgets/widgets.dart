@@ -6,3 +6,4 @@ export 'settings_row_tile.dart';
 export 'buttons.dart';
 export 'command_detail_sheet.dart';
 export 'banner_ad_widget.dart';
+export 'rating_prompt_card.dart';
