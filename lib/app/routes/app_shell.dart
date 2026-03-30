@@ -13,6 +13,7 @@ class AppShell extends StatefulWidget {
   final NotificationService notificationService;
   final ExecutionStorageService storageService;
   final StatsService statsService;
+  final RewardService rewardService;
   final AdService adService;
   final BillingService billingService;
   final PremiumService premiumService;
@@ -30,6 +31,7 @@ class AppShell extends StatefulWidget {
     required this.notificationService,
     required this.storageService,
     required this.statsService,
+    required this.rewardService,
     required this.adService,
     required this.billingService,
     required this.premiumService,
@@ -95,6 +97,7 @@ class _AppShellState extends State<AppShell> {
           notificationService: widget.notificationService,
           storageService: widget.storageService,
           statsService: widget.statsService,
+          rewardService: widget.rewardService,
           adService: widget.adService,
           premiumService: widget.premiumService,
           syncService: widget.syncService,
@@ -117,6 +120,7 @@ class _AppShellState extends State<AppShell> {
           challengeService: widget.challengeService,
           storageService: widget.storageService,
           syncService: widget.syncService,
+          adService: widget.adService,
         ),
       ),
       _ErrorBoundary(
@@ -131,6 +135,7 @@ class _AppShellState extends State<AppShell> {
           syncService: widget.syncService,
           premiumService: widget.premiumService,
           billingService: widget.billingService,
+          adService: widget.adService,
           onSettingsChanged: _onProfileSettingsChanged,
         ),
       ),

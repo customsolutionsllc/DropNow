@@ -83,7 +83,32 @@ class SchedulingService {
         );
       }
     }
+
+    // Schedule a "quiet" warning halfway through the window if future
+    final midpoint = today.add(
+      Duration(minutes: startMinutes + windowMinutes ~/ 2),
+    );
+    if (midpoint.isAfter(now)) {
+      await _notificationService.scheduleWarningNotification(
+        id: 200,
+        scheduledTime: midpoint,
+      );
+    }
+
+    // Schedule streak danger notification 1 hour before window ends
+    final streakWarningTime = today.add(Duration(minutes: endMinutes - 60));
+    if (streakWarningTime.isAfter(now)) {
+      await _notificationService.scheduleStreakNotification(
+        id: 201,
+        streak: _currentStreak,
+        scheduledTime: streakWarningTime,
+      );
+    }
   }
+
+  /// Current streak for notification messages. Set externally after stats init.
+  int _currentStreak = 0;
+  set currentStreak(int value) => _currentStreak = value;
 
   /// Get the next upcoming scheduled command (or null if none left today).
   ScheduledEntry? get nextUpcoming {

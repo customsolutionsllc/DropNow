@@ -11,6 +11,7 @@ class DropNowApp extends StatelessWidget {
   final NotificationService notificationService;
   final ExecutionStorageService storageService;
   final StatsService statsService;
+  final RewardService rewardService;
   final AdService adService;
   final BillingService billingService;
   final PremiumService premiumService;
@@ -28,6 +29,7 @@ class DropNowApp extends StatelessWidget {
     required this.notificationService,
     required this.storageService,
     required this.statsService,
+    required this.rewardService,
     required this.adService,
     required this.billingService,
     required this.premiumService,
@@ -51,6 +53,7 @@ class DropNowApp extends StatelessWidget {
         notificationService: notificationService,
         storageService: storageService,
         statsService: statsService,
+        rewardService: rewardService,
         adService: adService,
         billingService: billingService,
         premiumService: premiumService,

@@ -184,4 +184,75 @@ class NotificationService {
     if (!isPlatformSupported || !_initialized) return;
     await _plugin.cancelAll();
   }
+
+  /// Show a warning notification ("You've been quiet today").
+  Future<void> scheduleWarningNotification({
+    required int id,
+    required DateTime scheduledTime,
+  }) async {
+    if (!isPlatformSupported || !_initialized) return;
+
+    final delay = scheduledTime.difference(DateTime.now());
+    if (delay.isNegative) return;
+
+    Future.delayed(delay, () async {
+      const androidDetails = AndroidNotificationDetails(
+        'dropnow_reminders',
+        'Reminders',
+        channelDescription: 'DropNow activity reminders',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(),
+        linux: LinuxNotificationDetails(),
+      );
+
+      await _plugin.show(
+        id: id,
+        title: 'You\'ve been quiet today 👀',
+        body: 'Your commands are waiting. Don\'t let them down.',
+        notificationDetails: details,
+        payload: 'check_in',
+      );
+    });
+  }
+
+  /// Show a streak danger notification.
+  Future<void> scheduleStreakNotification({
+    required int id,
+    required int streak,
+    required DateTime scheduledTime,
+  }) async {
+    if (!isPlatformSupported || !_initialized) return;
+
+    final delay = scheduledTime.difference(DateTime.now());
+    if (delay.isNegative) return;
+
+    Future.delayed(delay, () async {
+      const androidDetails = AndroidNotificationDetails(
+        'dropnow_streak',
+        'Streak Alerts',
+        channelDescription: 'DropNow streak danger notifications',
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(),
+        linux: LinuxNotificationDetails(),
+      );
+
+      await _plugin.show(
+        id: id,
+        title: 'Your streak is in danger! 🔥',
+        body: '$streak-day streak on the line. Open the app and protect it.',
+        notificationDetails: details,
+        payload: 'check_in',
+      );
+    });
+  }
 }

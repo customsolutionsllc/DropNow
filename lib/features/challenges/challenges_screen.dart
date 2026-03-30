@@ -4,6 +4,7 @@ import 'package:drop_now/core/constants/constants.dart';
 import 'package:drop_now/core/models/models.dart';
 import 'package:drop_now/core/services/auth_service.dart';
 import 'package:drop_now/core/services/challenge_service.dart';
+import 'package:drop_now/core/services/ad_service.dart';
 import 'package:drop_now/core/services/execution_storage_service.dart';
 import 'package:drop_now/core/services/firestore_sync_service.dart';
 import 'package:drop_now/app/widgets/widgets.dart';
@@ -13,6 +14,7 @@ class ChallengesScreen extends StatefulWidget {
   final ChallengeService? challengeService;
   final ExecutionStorageService storageService;
   final FirestoreSyncService? syncService;
+  final AdService adService;
 
   const ChallengesScreen({
     super.key,
@@ -20,6 +22,7 @@ class ChallengesScreen extends StatefulWidget {
     this.challengeService,
     required this.storageService,
     this.syncService,
+    required this.adService,
   });
 
   @override
@@ -229,6 +232,11 @@ class ChallengesScreenState extends State<ChallengesScreen> {
     );
     await widget.storageService.addRecord(record);
     widget.syncService?.syncRecord(record);
+
+    // Show interstitial ad after challenge completion
+    if (widget.adService.onCommandCompleted()) {
+      await widget.adService.showInterstitialAd();
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(

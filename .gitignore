@@ -43,3 +43,26 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Phase documentation (development notes)
+completed_phase_*.md
+
+# Test screenshots & UI dumps
+test_screen.png
+test_screenshot_1.png
+ui*.xml
+
+# Source icon (launcher icons already generated)
+app-icon.png
+
+# Ads sub-project (not part of main app)
+dropnow-ads/
+
+# Firebase config (contains API keys)
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Signing keys
+key.properties
+*.jks
+*.keystore

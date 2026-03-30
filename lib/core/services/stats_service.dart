@@ -138,4 +138,41 @@ class StatsService {
     }
     return total;
   }
+
+  /// Longest streak ever achieved.
+  int get longestStreak {
+    final dates = _storage.allDates.toList()..sort();
+    if (dates.isEmpty) return 0;
+
+    int longest = 0;
+    int current = 0;
+    DateTime? prevDate;
+
+    for (final dateKey in dates) {
+      // Check if this date has a completion or streak protection
+      final records = _storage.getRecordsForDate(dateKey);
+      final hasCompletion = records.any(
+        (r) => r.status == CommandStatus.completed,
+      );
+      final hasProtection = isDateStreakProtected?.call(dateKey) ?? false;
+      if (!hasCompletion && !hasProtection) continue;
+
+      // Parse date key (yyyy-MM-dd)
+      final parts = dateKey.split('-');
+      if (parts.length != 3) continue;
+      final date = DateTime.tryParse(dateKey);
+      if (date == null) continue;
+
+      if (prevDate != null && date.difference(prevDate).inDays == 1) {
+        current++;
+      } else {
+        current = 1;
+      }
+
+      if (current > longest) longest = current;
+      prevDate = date;
+    }
+
+    return longest;
+  }
 }

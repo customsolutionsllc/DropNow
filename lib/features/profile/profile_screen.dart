@@ -14,6 +14,7 @@ class ProfileScreen extends StatefulWidget {
   final FirestoreSyncService? syncService;
   final PremiumService premiumService;
   final BillingService billingService;
+  final AdService adService;
   final VoidCallback? onSettingsChanged;
 
   const ProfileScreen({
@@ -26,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
     this.syncService,
     required this.premiumService,
     required this.billingService,
+    required this.adService,
     this.onSettingsChanged,
   });
 
@@ -323,6 +325,11 @@ class ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: AppSpacing.lg),
 
               _buildProfileHeader(context),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Analytics
+              const SectionHeader(title: 'Your Analytics'),
+              _buildAnalyticsCards(context),
               const SizedBox(height: AppSpacing.xl),
 
               // System toggle
@@ -441,6 +448,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                 ),
               ]),
               const SizedBox(height: AppSpacing.xl),
+
+              // Banner ad (free users)
+              if (!widget.adService.isPremium) const BannerAdWidget(),
+              const SizedBox(height: AppSpacing.md),
             ],
           ),
         ),
@@ -562,6 +573,62 @@ class ProfileScreenState extends State<ProfileScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAnalyticsCards(BuildContext context) {
+    final stats = widget.statsService;
+    final today = stats.todayStats;
+    final completionRate = today.totalCommands > 0
+        ? (today.completionRate * 100).toStringAsFixed(0)
+        : '—';
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: StatCard(
+                label: 'Completion Rate',
+                value: today.totalCommands > 0 ? '$completionRate%' : '—',
+                icon: Icons.pie_chart_rounded,
+                accentColor: AppColors.accent,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: StatCard(
+                label: 'Longest Streak',
+                value: '${stats.longestStreak}',
+                icon: Icons.emoji_events_rounded,
+                accentColor: AppColors.warning,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: StatCard(
+                label: 'Today\'s Commands',
+                value: '${today.completed}/${today.totalCommands}',
+                icon: Icons.today_rounded,
+                accentColor: AppColors.success,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: StatCard(
+                label: 'Total Calories',
+                value: '${stats.totalCalories.toStringAsFixed(0)}',
+                icon: Icons.local_fire_department_rounded,
+                accentColor: AppColors.error,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

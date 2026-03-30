@@ -11,6 +11,7 @@ class HomeScreen extends StatefulWidget {
   final NotificationService notificationService;
   final ExecutionStorageService storageService;
   final StatsService statsService;
+  final RewardService rewardService;
   final AdService adService;
   final PremiumService premiumService;
   final FirestoreSyncService? syncService;
@@ -24,6 +25,7 @@ class HomeScreen extends StatefulWidget {
     required this.notificationService,
     required this.storageService,
     required this.statsService,
+    required this.rewardService,
     required this.adService,
     required this.premiumService,
     this.syncService,
@@ -38,11 +40,69 @@ class HomeScreenState extends State<HomeScreen> {
   WorkoutCommand? _latestCommand;
   bool _isActive = false;
   String? _lastFeedback;
+  CommandStatus? _lastCommandStatus;
 
   @override
   void initState() {
     super.initState();
     _loadState();
+    // Show daily reward popup after frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkDailyReward());
+  }
+
+  Future<void> _checkDailyReward() async {
+    final reward = await widget.rewardService.claimDailyReward();
+    if (reward == null || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '${reward.emoji} Daily Reward!',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 22),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              reward.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              reward.description,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Got it!'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _loadState() {
@@ -119,12 +179,14 @@ class HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    final streak = widget.statsService.currentStreak;
     final feedback = status == CommandStatus.completed
-        ? FeedbackService.onDone(command.personality)
-        : FeedbackService.onSkipped(command.personality);
+        ? FeedbackService.onDone(command.personality, streak: streak)
+        : FeedbackService.onSkipped(command.personality, streak: streak);
 
     setState(() {
       _lastFeedback = feedback;
+      _lastCommandStatus = status;
     });
 
     if (mounted) {
@@ -266,6 +328,17 @@ class HomeScreenState extends State<HomeScreen> {
 
               const SectionHeader(title: 'Current Settings'),
               _buildSettingsSummary(context, prefs),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Rewarded ad quick actions (free users only)
+              if (!widget.adService.isPremium) ...[
+                const SectionHeader(title: 'Ad Rewards'),
+                _buildRewardedActions(context),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+
+              // Banner ad (free users)
+              if (!widget.adService.isPremium) const BannerAdWidget(),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),
@@ -361,6 +434,29 @@ class HomeScreenState extends State<HomeScreen> {
           SnackBar(
             content: const Text(
               'Streak protected! 🛡️ Keep it going tomorrow.',
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Check for free streak shield from daily reward
+    if (widget.rewardService.hasStreakShield) {
+      await widget.rewardService.useStreakShield();
+      // Apply streak protection via ad service (same as ad-based)
+      await widget.adService.markStreakProtectionForPremium();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              '🛡️ Streak shield used! Streak protected for today.',
             ),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
@@ -830,5 +926,183 @@ class HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildRewardedActions(BuildContext context) {
+    // Show "Get Extra Chance" only when latest command was skipped
+    final showExtraChance =
+        _latestCommand != null && _lastCommandStatus == CommandStatus.skipped;
+
+    return Row(
+      children: [
+        // Skip Cooldown — get a new command instantly
+        Expanded(
+          child: DashboardCard(
+            onTap: _onSkipCooldown,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.fast_forward_rounded,
+                  color: AppColors.warning,
+                  size: 28,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Skip Cooldown',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Watch ad for instant command',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (showExtraChance) ...[
+          const SizedBox(width: AppSpacing.md),
+          // Get Extra Chance — retry a skipped command
+          Expanded(
+            child: DashboardCard(
+              onTap: _onExtraChance,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.replay_rounded,
+                    color: AppColors.info,
+                    size: 28,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Extra Chance',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Watch ad to redo last skip',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontSize: 10),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _onSkipCooldown() async {
+    // Check for free cooldown skip from daily reward
+    if (widget.rewardService.hasFreeCooldownSkip) {
+      await widget.rewardService.useFreeCooldownSkip();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('⚡ Free skip used! Here\'s your command.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } else {
+      // Watch rewarded ad
+      if (!widget.adService.isRewardedAdReady) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Ad not ready yet. Try again in a moment.'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      final rewarded = await widget.adService.showRewardedAd();
+      if (!rewarded) return;
+    }
+
+    if (!mounted) return;
+    // Generate and show a new command immediately
+    final command = widget.commandService.generate(
+      difficulty: widget.prefsService.difficulty,
+      personality: widget.prefsService.personality,
+    );
+    setState(() => _latestCommand = command);
+
+    final result = await CommandDetailSheet.show(context, command);
+    if (result != null && mounted) {
+      await _recordAction(command, result);
+    }
+  }
+
+  Future<void> _onExtraChance() async {
+    if (!widget.adService.isRewardedAdReady) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Ad not ready yet. Try again in a moment.'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final rewarded = await widget.adService.showRewardedAd();
+    if (rewarded && mounted) {
+      // Regenerate a fresh command (same difficulty/personality) as second chance
+      final command = widget.commandService.generate(
+        difficulty: widget.prefsService.difficulty,
+        personality: widget.prefsService.personality,
+      );
+      setState(() {
+        _latestCommand = command;
+        _lastFeedback = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Extra chance unlocked! Show them what you got. 💪',
+          ),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+
+      final result = await CommandDetailSheet.show(context, command);
+      if (result != null && mounted) {
+        await _recordAction(command, result);
+      }
+    }
   }
 }

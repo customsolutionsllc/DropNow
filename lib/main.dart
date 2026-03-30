@@ -62,6 +62,9 @@ Future<void> main() async {
 
       final statsService = StatsService(storageService);
 
+      // Initialize daily reward service
+      final rewardService = RewardService(prefsService.prefs);
+
       // Initialize AdService (monetization)
       final adService = AdService(prefsService.prefs);
       await adService.init();
@@ -104,6 +107,9 @@ Future<void> main() async {
         }
       }
 
+      // Wire streak into scheduling for notification messages
+      schedulingService.currentStreak = statsService.currentStreak;
+
       runApp(
         DropNowApp(
           prefsService: prefsService,
@@ -112,6 +118,7 @@ Future<void> main() async {
           notificationService: notificationService,
           storageService: storageService,
           statsService: statsService,
+          rewardService: rewardService,
           adService: adService,
           billingService: billingService,
           premiumService: premiumService,
